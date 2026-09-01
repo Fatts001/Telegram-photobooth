@@ -10,7 +10,7 @@ const TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = 8401116235;
 
 // ===============================
-// WEB SERVER DULU
+// WEB SERVER ABASTHAN
 // ===============================
 
 const server = http.createServer((req, res) => {
@@ -22,17 +22,16 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-    console.log(`🌐 Web server aktif di port ${PORT}`);
+    console.log("Web server aktif di port " + PORT);
 });
 
 // ===============================
-// CEK TOKEN
+// TOKEN
 // ===============================
 
 if (!TOKEN) {
-    console.error("❌ BOT_TOKEN TIDAK DITEMUKAN!");
-    console.error("⚠️ Tambahkan BOT_TOKEN di Environment Variables Abasthan.");
-    return;
+    console.error("BOT_TOKEN belum ditemukan!");
+    process.exit(1);
 }
 
 // ===============================
@@ -40,7 +39,6 @@ if (!TOKEN) {
 // ===============================
 
 const bot = new Telegraf(TOKEN);
-
 const sessions = new Map();
 
 // ===============================
@@ -80,7 +78,78 @@ const backgrounds = {
 };
 
 // ===============================
-// KEYBOARD BACKGROUND
+// FILTER
+// ===============================
+
+const filters = {
+    normal: "🌈 Normal",
+    bw: "🖤 Hitam Putih",
+    vintage: "📼 Vintage",
+    bright: "☀️ Bright",
+    dark: "🌙 Dark",
+    soft: "🌸 Soft",
+    film: "🎞️ Film",
+    warm: "🔥 Warm",
+    cool: "❄️ Cool"
+};
+
+// ===============================
+// DEKORASI
+// ===============================
+
+const decorations = {
+    none: "❌ Tanpa Dekorasi",
+    sparkle: "✨ Sparkle",
+    hearts: "❤️ Hearts",
+    flowers: "🌸 Flowers",
+    butterflies: "🦋 Butterflies",
+    stars: "⭐ Stars",
+    cute: "🎀 Cute"
+};
+
+// ===============================
+// AUDIO
+// ===============================
+
+async function sendAudio(ctx, fileName) {
+    const filePath = path.join(__dirname, fileName);
+
+    if (!fs.existsSync(filePath)) {
+        console.log("Audio tidak ditemukan: " + fileName);
+        return;
+    }
+
+    try {
+        await ctx.replyWithAudio({
+            source: filePath
+        });
+    } catch (error) {
+        console.error("Gagal mengirim audio:", error.message);
+    }
+}
+
+// ===============================
+// MENU JUMLAH FOTO
+// ===============================
+
+function countKeyboard() {
+    return Markup.inlineKeyboard([
+        [
+            Markup.button.callback("2️⃣ 2 Foto", "count_2"),
+            Markup.button.callback("3️⃣ 3 Foto", "count_3")
+        ],
+        [
+            Markup.button.callback("4️⃣ 4 Foto", "count_4"),
+            Markup.button.callback("5️⃣ 5 Foto", "count_5")
+        ],
+        [
+            Markup.button.callback("6️⃣ 6 Foto", "count_6")
+        ]
+    ]);
+}
+
+// ===============================
+// MENU BACKGROUND
 // ===============================
 
 function backgroundKeyboard() {
@@ -101,108 +170,300 @@ function backgroundKeyboard() {
 }
 
 // ===============================
+// MENU FILTER
+// ===============================
+
+function filterKeyboard() {
+    return Markup.inlineKeyboard([
+        [
+            Markup.button.callback("🌈 Normal", "filter_normal"),
+            Markup.button.callback("🖤 B&W", "filter_bw")
+        ],
+        [
+            Markup.button.callback("📼 Vintage", "filter_vintage"),
+            Markup.button.callback("☀️ Bright", "filter_bright")
+        ],
+        [
+            Markup.button.callback("🌙 Dark", "filter_dark"),
+            Markup.button.callback("🌸 Soft", "filter_soft")
+        ],
+        [
+            Markup.button.callback("🎞️ Film", "filter_film"),
+            Markup.button.callback("🔥 Warm", "filter_warm")
+        ],
+        [
+            Markup.button.callback("❄️ Cool", "filter_cool")
+        ]
+    ]);
+}
+
+// ===============================
+// MENU DEKORASI
+// ===============================
+
+function decorationKeyboard() {
+    return Markup.inlineKeyboard([
+        [
+            Markup.button.callback("❌ Tanpa Dekorasi", "decor_none")
+        ],
+        [
+            Markup.button.callback("✨ Sparkle", "decor_sparkle"),
+            Markup.button.callback("❤️ Hearts", "decor_hearts")
+        ],
+        [
+            Markup.button.callback("🌸 Flowers", "decor_flowers"),
+            Markup.button.callback("🦋 Butterflies", "decor_butterflies")
+        ],
+        [
+            Markup.button.callback("⭐ Stars", "decor_stars"),
+            Markup.button.callback("🎀 Cute", "decor_cute")
+        ]
+    ]);
+}
+
+// ===============================
 // START
 // ===============================
 
 bot.start(async (ctx) => {
 
     sessions.set(ctx.from.id, {
-        photos: [],
-        background: null
+        count: null,
+        background: null,
+        filter: "normal",
+        decoration: "none",
+        title: "",
+        waitingTitle: false,
+        photos: []
     });
 
     await ctx.reply(
         "📸 PHOTOBOOTH\n\n" +
-        "Selamat datang! ✨\n\n" +
-        "Pilih background terlebih dahulu 👇\n\n" +
-        "Setelah itu kirim 4 foto satu per satu.",
+        "Selamat datang kak! ✨\n\n" +
+        "Berapa foto yang mau dibuat?",
+        countKeyboard()
+    );
+
+    await sendAudio(ctx, "start.mp3");
+});
+
+// ===============================
+// JUMLAH FOTO
+// ===============================
+
+bot.action(/^count_(2|3|4|5|6)$/, async (ctx) => {
+
+    const userId = ctx.from.id;
+    const count = Number(ctx.match[1]);
+
+    if (!sessions.has(userId)) {
+        await ctx.answerCbQuery("Ketik /start dulu.");
+        return;
+    }
+
+    const session = sessions.get(userId);
+
+    session.count = count;
+    session.photos = [];
+
+    await ctx.answerCbQuery("Jumlah foto dipilih!");
+
+    await ctx.editMessageText(
+        "✅ Jumlah foto: " + count + "\n\n" +
+        "Sekarang pilih background 🎨",
         backgroundKeyboard()
     );
 });
 
 // ===============================
-// PILIH BACKGROUND
+// BACKGROUND
 // ===============================
 
 bot.action(/^bg_(.+)$/, async (ctx) => {
 
-    try {
+    const userId = ctx.from.id;
+    const selected = ctx.match[1];
 
-        const userId = ctx.from.id;
-        const selected = ctx.match[1];
-
-        if (!backgrounds[selected]) {
-            await ctx.answerCbQuery("❌ Background tidak ditemukan.");
-            return;
-        }
-
-        const backgroundPath = path.join(
-            __dirname,
-            backgrounds[selected].file
-        );
-
-        if (!fs.existsSync(backgroundPath)) {
-
-            console.error(
-                `❌ File tidak ditemukan: ${backgroundPath}`
-            );
-
-            await ctx.answerCbQuery(
-                "❌ File background belum ada."
-            );
-
-            await ctx.reply(
-                `❌ File ${backgrounds[selected].file} tidak ditemukan di server.\n\n` +
-                "Pastikan file sudah ada di repository GitHub."
-            );
-
-            return;
-        }
-
-        if (!sessions.has(userId)) {
-            sessions.set(userId, {
-                photos: [],
-                background: null
-            });
-        }
-
-        const session = sessions.get(userId);
-
-        session.background = selected;
-        session.photos = [];
-
-        await ctx.answerCbQuery(
-            `${backgrounds[selected].name} dipilih!`
-        );
-
-        await ctx.editMessageText(
-            "✅ BACKGROUND DIPILIH!\n\n" +
-            `🎨 ${backgrounds[selected].name}\n\n` +
-            "Sekarang kirim 4 foto 📸\n\n" +
-            "1️⃣ Foto pertama\n" +
-            "2️⃣ Foto kedua\n" +
-            "3️⃣ Foto ketiga\n" +
-            "4️⃣ Foto keempat\n\n" +
-            "Foto ke-4 akan langsung dibuat menjadi photobooth ✨"
-        );
-
-    } catch (error) {
-
-        console.error("❌ ERROR BACKGROUND:", error);
-
+    if (!backgrounds[selected]) {
+        await ctx.answerCbQuery("Background tidak ditemukan.");
+        return;
     }
+
+    if (!sessions.has(userId)) {
+        await ctx.answerCbQuery("Ketik /start dulu.");
+        return;
+    }
+
+    const filePath = path.join(
+        __dirname,
+        backgrounds[selected].file
+    );
+
+    if (!fs.existsSync(filePath)) {
+
+        await ctx.answerCbQuery("File tidak ditemukan.");
+
+        await ctx.reply(
+            "❌ File " +
+            backgrounds[selected].file +
+            " belum ada di repository."
+        );
+
+        return;
+    }
+
+    const session = sessions.get(userId);
+
+    session.background = selected;
+
+    await ctx.answerCbQuery(
+        backgrounds[selected].name + " dipilih!"
+    );
+
+    await ctx.editMessageText(
+        "🎨 Background: " +
+        backgrounds[selected].name +
+        "\n\n" +
+        "Pilih filter foto 🎞️",
+        filterKeyboard()
+    );
+
+    await sendAudio(ctx, "background.mp3");
 });
 
 // ===============================
-// BACKGROUND COMMAND
+// FILTER
+// ===============================
+
+bot.action(/^filter_(.+)$/, async (ctx) => {
+
+    const userId = ctx.from.id;
+    const selected = ctx.match[1];
+
+    if (!filters[selected]) {
+        await ctx.answerCbQuery("Filter tidak ditemukan.");
+        return;
+    }
+
+    if (!sessions.has(userId)) {
+        await ctx.answerCbQuery("Ketik /start dulu.");
+        return;
+    }
+
+    const session = sessions.get(userId);
+
+    session.filter = selected;
+
+    await ctx.answerCbQuery(
+        filters[selected] + " dipilih!"
+    );
+
+    await ctx.editMessageText(
+        "🎞️ Filter: " +
+        filters[selected] +
+        "\n\n" +
+        "Sekarang pilih dekorasi ✨",
+        decorationKeyboard()
+    );
+});
+
+// ===============================
+// DEKORASI
+// ===============================
+
+bot.action(/^decor_(.+)$/, async (ctx) => {
+
+    const userId = ctx.from.id;
+    const selected = ctx.match[1];
+
+    if (!decorations[selected]) {
+        await ctx.answerCbQuery("Dekorasi tidak ditemukan.");
+        return;
+    }
+
+    if (!sessions.has(userId)) {
+        await ctx.answerCbQuery("Ketik /start dulu.");
+        return;
+    }
+
+    const session = sessions.get(userId);
+
+    session.decoration = selected;
+    session.waitingTitle = true;
+
+    await ctx.answerCbQuery(
+        decorations[selected] + " dipilih!"
+    );
+
+    await ctx.editMessageText(
+        "✨ Dekorasi: " +
+        decorations[selected] +
+        "\n\n" +
+        "✍️ Sekarang kirim judul photobooth.\n\n" +
+        "Contoh:\n" +
+        "HAPPY BIRTHDAY 🎂\n" +
+        "RARA & FRIENDS 💕\n" +
+        "MY PHOTO DAY ✨\n\n" +
+        "Kalau tidak mau judul, ketik:\n" +
+        "TANPA JUDUL"
+    );
+});
+
+// ===============================
+// TEKS JUDUL
+// ===============================
+
+bot.on("text", async (ctx) => {
+
+    const userId = ctx.from.id;
+
+    if (!sessions.has(userId)) {
+        return;
+    }
+
+    const session = sessions.get(userId);
+
+    if (!session.waitingTitle) {
+        return;
+    }
+
+    const text = ctx.message.text.trim();
+
+    if (text.toLowerCase() === "tanpa judul") {
+        session.title = "";
+    } else {
+        session.title = text.substring(0, 40);
+    }
+
+    session.waitingTitle = false;
+
+    await ctx.reply(
+        "✅ Judul berhasil disimpan!\n\n" +
+        "✍️ " +
+        (session.title || "Tanpa Judul") +
+        "\n\n" +
+        "📸 Sekarang kirim " +
+        session.count +
+        " foto satu per satu."
+    );
+});
+
+// ===============================
+// /BACKGROUND
 // ===============================
 
 bot.command("background", async (ctx) => {
 
     if (!sessions.has(ctx.from.id)) {
+
         sessions.set(ctx.from.id, {
-            photos: [],
-            background: null
+            count: 4,
+            background: null,
+            filter: "normal",
+            decoration: "none",
+            title: "",
+            waitingTitle: false,
+            photos: []
         });
     }
 
@@ -213,7 +474,7 @@ bot.command("background", async (ctx) => {
 });
 
 // ===============================
-// CANCEL
+// /CANCEL
 // ===============================
 
 bot.command("cancel", async (ctx) => {
@@ -221,13 +482,13 @@ bot.command("cancel", async (ctx) => {
     sessions.delete(ctx.from.id);
 
     await ctx.reply(
-        "❌ Sesi dibatalkan.\n\n" +
+        "❌ Photobooth dibatalkan.\n\n" +
         "Ketik /start untuk mulai lagi."
     );
 });
 
 // ===============================
-// SARAN
+// /SARAN
 // ===============================
 
 bot.command("saran", async (ctx) => {
@@ -250,7 +511,7 @@ bot.command("saran", async (ctx) => {
     const name = ctx.from.first_name || "Tidak diketahui";
 
     const username = ctx.from.username
-        ? `@${ctx.from.username}`
+        ? "@" + ctx.from.username
         : "Tidak ada username";
 
     try {
@@ -259,26 +520,194 @@ bot.command("saran", async (ctx) => {
             ADMIN_ID,
 
             "💡 SARAN BARU\n\n" +
-            `👤 Nama: ${name}\n` +
-            `🔹 Username: ${username}\n` +
-            `🆔 ID: ${userId}\n\n` +
-            `💬 Saran:\n${text}`
+            "👤 Nama: " + name + "\n" +
+            "🔹 Username: " + username + "\n" +
+            "🆔 ID: " + userId + "\n\n" +
+            "💬 Saran:\n" +
+            text
         );
 
         await ctx.reply(
-            "✅ Saran berhasil dikirim!\n\n" +
-            "Makasih sudah membantu mengembangkan bot ini ❤️"
+            "✅ Saran berhasil dikirim ke admin!\n\n" +
+            "Makasih sudah kasih masukan ❤️"
         );
 
     } catch (error) {
 
-        console.error("❌ ERROR SARAN:", error);
+        console.error(
+            "ERROR SARAN:",
+            error.message
+        );
 
         await ctx.reply(
             "❌ Saran gagal dikirim."
         );
     }
 });
+
+// ===============================
+// FILTER FOTO
+// ===============================
+
+async function applyFilter(buffer, filter) {
+
+    let image = sharp(buffer);
+
+    if (filter === "bw") {
+
+        image = image
+            .grayscale()
+            .modulate({
+                brightness: 1.05,
+                saturation: 0
+            });
+
+    } else if (filter === "vintage") {
+
+        image = image
+            .modulate({
+                brightness: 1.05,
+                saturation: 0.75
+            });
+
+    } else if (filter === "bright") {
+
+        image = image
+            .modulate({
+                brightness: 1.25,
+                saturation: 1.1
+            });
+
+    } else if (filter === "dark") {
+
+        image = image
+            .modulate({
+                brightness: 0.72,
+                saturation: 0.95
+            });
+
+    } else if (filter === "soft") {
+
+        image = image
+            .modulate({
+                brightness: 1.08,
+                saturation: 0.85
+            });
+
+    } else if (filter === "film") {
+
+        image = image
+            .modulate({
+                brightness: 0.95,
+                saturation: 1.2
+            });
+
+    } else if (filter === "warm") {
+
+        image = image
+            .modulate({
+                brightness: 1.05,
+                saturation: 1.1
+            })
+            .tint({
+                r: 255,
+                g: 225,
+                b: 190
+            });
+
+    } else if (filter === "cool") {
+
+        image = image
+            .modulate({
+                brightness: 1.02,
+                saturation: 0.95
+            })
+            .tint({
+                r: 190,
+                g: 220,
+                b: 255
+            });
+    }
+
+    return image
+        .resize(780, 780, {
+            fit: "cover",
+            position: "centre"
+        })
+        .jpeg({
+            quality: 95
+        })
+        .toBuffer();
+}
+
+// ===============================
+// DEKORASI
+// ===============================
+
+function decorationSVG(type, width, height) {
+
+    let items = "";
+
+    if (type === "sparkle") {
+        items = `
+        <text x="30" y="75" font-size="55">✨</text>
+        <text x="${width - 85}" y="75" font-size="55">✨</text>
+        <text x="30" y="${height - 30}" font-size="55">✨</text>
+        <text x="${width - 85}" y="${height - 30}" font-size="55">✨</text>
+        `;
+    }
+
+    if (type === "hearts") {
+        items = `
+        <text x="30" y="75" font-size="55">❤️</text>
+        <text x="${width - 90}" y="75" font-size="55">❤️</text>
+        <text x="30" y="${height - 30}" font-size="55">❤️</text>
+        <text x="${width - 90}" y="${height - 30}" font-size="55">❤️</text>
+        `;
+    }
+
+    if (type === "flowers") {
+        items = `
+        <text x="25" y="75" font-size="55">🌸</text>
+        <text x="${width - 90}" y="75" font-size="55">🌷</text>
+        <text x="25" y="${height - 30}" font-size="55">🌸</text>
+        <text x="${width - 90}" y="${height - 30}" font-size="55">🌷</text>
+        `;
+    }
+
+    if (type === "butterflies") {
+        items = `
+        <text x="25" y="75" font-size="55">🦋</text>
+        <text x="${width - 90}" y="75" font-size="55">🦋</text>
+        <text x="25" y="${height - 30}" font-size="55">🦋</text>
+        <text x="${width - 90}" y="${height - 30}" font-size="55">🦋</text>
+        `;
+    }
+
+    if (type === "stars") {
+        items = `
+        <text x="25" y="75" font-size="55">⭐</text>
+        <text x="${width - 90}" y="75" font-size="55">⭐</text>
+        <text x="25" y="${height - 30}" font-size="55">⭐</text>
+        <text x="${width - 90}" y="${height - 30}" font-size="55">⭐</text>
+        `;
+    }
+
+    if (type === "cute") {
+        items = `
+        <text x="25" y="75" font-size="55">🎀</text>
+        <text x="${width - 90}" y="75" font-size="55">💗</text>
+        <text x="25" y="${height - 30}" font-size="55">🎀</text>
+        <text x="${width - 90}" y="${height - 30}" font-size="55">💗</text>
+        `;
+    }
+
+    return `
+    <svg width="${width}" height="${height}">
+        ${items}
+    </svg>
+    `;
+}
 
 // ===============================
 // FOTO
@@ -291,8 +720,7 @@ bot.on("photo", async (ctx) => {
     if (!sessions.has(userId)) {
 
         await ctx.reply(
-            "⚠️ Lu belum mulai photobooth.\n\n" +
-            "Ketik /start dulu."
+            "⚠️ Ketik /start dulu untuk memulai."
         );
 
         return;
@@ -300,17 +728,34 @@ bot.on("photo", async (ctx) => {
 
     const session = sessions.get(userId);
 
-    if (!session.background) {
+    if (!session.count) {
 
         await ctx.reply(
-            "⚠️ Pilih background dulu.\n\n" +
-            "Ketik /background."
+            "⚠️ Pilih jumlah foto terlebih dahulu."
         );
 
         return;
     }
 
-    if (session.photos.length >= 4) {
+    if (!session.background) {
+
+        await ctx.reply(
+            "⚠️ Pilih background terlebih dahulu."
+        );
+
+        return;
+    }
+
+    if (session.waitingTitle) {
+
+        await ctx.reply(
+            "✍️ Masukkan judul terlebih dahulu."
+        );
+
+        return;
+    }
+
+    if (session.photos.length >= session.count) {
         return;
     }
 
@@ -319,18 +764,25 @@ bot.on("photo", async (ctx) => {
         const number = session.photos.length + 1;
 
         await ctx.reply(
-            `⏳ Memproses foto ${number}/4...`
+            "⏳ Memproses foto " +
+            number +
+            "/" +
+            session.count +
+            "..."
         );
 
-        const photos = ctx.message.photo;
-
-        const photo = photos[photos.length - 1];
+        const telegramPhotos = ctx.message.photo;
+        const photo = telegramPhotos[
+            telegramPhotos.length - 1
+        ];
 
         const fileLink = await ctx.telegram.getFileLink(
             photo.file_id
         );
 
-        const response = await fetch(fileLink.href);
+        const response = await fetch(
+            fileLink.href
+        );
 
         if (!response.ok) {
             throw new Error("Gagal mengambil foto.");
@@ -342,95 +794,136 @@ bot.on("photo", async (ctx) => {
 
         session.photos.push(buffer);
 
-        if (session.photos.length < 4) {
+        if (session.photos.length < session.count) {
 
             await ctx.reply(
-                `✅ Foto ${session.photos.length}/4 diterima!\n\n` +
-                `📸 Kirim foto ke-${session.photos.length + 1}.`
+                "✅ Foto " +
+                session.photos.length +
+                "/" +
+                session.count +
+                " diterima!\n\n" +
+                "📸 Kirim foto ke-" +
+                (session.photos.length + 1) +
+                "."
             );
 
             return;
         }
 
         await ctx.reply(
-            "✨ 4 foto sudah lengkap!\n\n" +
-            "🎨 Membuat photobooth..."
+            "✨ Semua foto sudah lengkap!\n\n" +
+            "🖼️ Membuat photobooth..."
         );
 
-        // ===============================
+        // ===========================
         // UKURAN
-        // ===============================
+        // ===========================
 
         const photoWidth = 780;
         const photoHeight = 780;
 
-        const padding = 45;
+        const padding = 50;
         const gap = 30;
-        const footerHeight = 170;
+
+        const columns = 2;
+        const rows = Math.ceil(
+            session.count / columns
+        );
+
+        const footerHeight = 220;
 
         const canvasWidth =
-            padding +
-            photoWidth +
-            gap +
-            photoWidth +
-            padding;
+            padding * 2 +
+            photoWidth * columns +
+            gap * (columns - 1);
 
         const canvasHeight =
-            padding +
-            photoHeight +
-            gap +
-            photoHeight +
-            footerHeight +
-            padding;
+            padding * 2 +
+            photoHeight * rows +
+            gap * (rows - 1) +
+            footerHeight;
 
-        // ===============================
+        // ===========================
         // BACKGROUND
-        // ===============================
+        // ===========================
 
-        const backgroundPath = path.join(
+        const bgPath = path.join(
             __dirname,
             backgrounds[session.background].file
         );
 
-        const background = await sharp(backgroundPath)
-            .resize(canvasWidth, canvasHeight, {
-                fit: "cover",
-                position: "centre"
-            })
+        const background = await sharp(bgPath)
+            .resize(
+                canvasWidth,
+                canvasHeight,
+                {
+                    fit: "cover",
+                    position: "centre"
+                }
+            )
             .jpeg({
                 quality: 95
             })
             .toBuffer();
 
-        // ===============================
-        // RESIZE FOTO
-        // ===============================
+        // ===========================
+        // FOTO
+        // ===========================
 
-        const resizedPhotos = [];
+        const processedPhotos = [];
 
         for (const image of session.photos) {
 
-            const resized = await sharp(image)
-                .resize(photoWidth, photoHeight, {
-                    fit: "cover",
-                    position: "centre"
-                })
-                .jpeg({
-                    quality: 95
-                })
-                .toBuffer();
+            const processed = await applyFilter(
+                image,
+                session.filter
+            );
 
-            resizedPhotos.push(resized);
+            processedPhotos.push(processed);
         }
 
-        // ===============================
-        // FOOTER
-        // ===============================
+        // ===========================
+        // COMPOSITE
+        // ===========================
 
-        const selectedName =
-            backgrounds[session.background].name;
+        const composite = [];
 
-        const date = new Date().toLocaleDateString(
+        for (
+            let i = 0;
+            i < processedPhotos.length;
+            i++
+        ) {
+
+            const row = Math.floor(
+                i / columns
+            );
+
+            const column = i % columns;
+
+            const left =
+                padding +
+                column *
+                (photoWidth + gap);
+
+            const top =
+                padding +
+                row *
+                (photoHeight + gap);
+
+            composite.push({
+                input: processedPhotos[i],
+                left: left,
+                top: top
+            });
+        }
+
+        // ===========================
+        // TANGGAL + JAM
+        // ===========================
+
+        const now = new Date();
+
+        const date = now.toLocaleDateString(
             "id-ID",
             {
                 day: "2-digit",
@@ -440,98 +933,128 @@ bot.on("photo", async (ctx) => {
             }
         );
 
+        const time = now.toLocaleTimeString(
+            "id-ID",
+            {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Jakarta"
+            }
+        );
+
+        // ===========================
+        // FOOTER
+        // ===========================
+
+        const footerTop =
+            padding * 2 +
+            photoHeight * rows +
+            gap * (rows - 1);
+
+        const safeTitle =
+            escapeXml(session.title || "");
+
         const footer = `
-        <svg width="${canvasWidth}" height="${footerHeight}">
+        <svg
+            width="${canvasWidth}"
+            height="${footerHeight}">
+
             <style>
+
                 .title {
                     fill: white;
-                    font-size: 42px;
+                    font-size: 46px;
                     font-family: Arial;
                     font-weight: bold;
                 }
 
-                .sub {
+                .info {
                     fill: white;
                     font-size: 25px;
                     font-family: Arial;
                 }
+
             </style>
 
+            ${
+                safeTitle
+                    ? `
+                    <text
+                        x="50%"
+                        y="65"
+                        text-anchor="middle"
+                        class="title">
+                        ${safeTitle}
+                    </text>
+                    `
+                    : ""
+            }
+
             <text
                 x="50%"
-                y="60"
+                y="${safeTitle ? 120 : 75}"
                 text-anchor="middle"
-                class="title">
-                PHOTOBOOTH
+                class="info">
+                ${date} • ${time}
             </text>
 
             <text
                 x="50%"
-                y="105"
+                y="${safeTitle ? 165 : 120}"
                 text-anchor="middle"
-                class="sub">
-                ${selectedName}
+                class="info">
+                ${backgrounds[session.background].name}
             </text>
 
-            <text
-                x="50%"
-                y="145"
-                text-anchor="middle"
-                class="sub">
-                ${date}
-            </text>
         </svg>
         `;
 
-        // ===============================
-        // GABUNG
-        // ===============================
+        composite.push({
+            input: Buffer.from(footer),
+            left: 0,
+            top: footerTop
+        });
 
-        const result = await sharp(background)
-            .composite([
+        // ===========================
+        // DEKORASI
+        // ===========================
 
-                {
-                    input: resizedPhotos[0],
-                    left: padding,
-                    top: padding
-                },
+        if (
+            session.decoration !== "none"
+        ) {
 
-                {
-                    input: resizedPhotos[1],
-                    left: padding + photoWidth + gap,
-                    top: padding
-                },
+            const decoration =
+                decorationSVG(
+                    session.decoration,
+                    canvasWidth,
+                    canvasHeight
+                );
 
-                {
-                    input: resizedPhotos[2],
-                    left: padding,
-                    top: padding + photoHeight + gap
-                },
+            composite.push({
+                input: Buffer.from(
+                    decoration
+                ),
+                left: 0,
+                top: 0
+            });
+        }
 
-                {
-                    input: resizedPhotos[3],
-                    left: padding + photoWidth + gap,
-                    top: padding + photoHeight + gap
-                },
+        // ===========================
+        // HASIL AKHIR
+        // ===========================
 
-                {
-                    input: Buffer.from(footer),
-                    left: 0,
-                    top:
-                        padding +
-                        photoHeight * 2 +
-                        gap * 2
-                }
-
-            ])
+        const result = await sharp(
+            background
+        )
+            .composite(composite)
             .jpeg({
                 quality: 95
             })
             .toBuffer();
 
-        // ===============================
+        // ===========================
         // KIRIM HASIL
-        // ===============================
+        // ===========================
 
         await ctx.replyWithPhoto(
             {
@@ -540,8 +1063,24 @@ bot.on("photo", async (ctx) => {
             {
                 caption:
                     "📸 Photobooth lu sudah jadi! ✨\n\n" +
-                    `🎨 ${selectedName}`
+                    "🎨 " +
+                    backgrounds[session.background].name +
+                    "\n" +
+                    "🎞️ " +
+                    filters[session.filter] +
+                    "\n" +
+                    "✨ " +
+                    decorations[session.decoration]
             }
+        );
+
+        // ===========================
+        // SUARA SELESAI
+        // ===========================
+
+        await sendAudio(
+            ctx,
+            "selesai.mp3"
         );
 
         sessions.delete(userId);
@@ -549,7 +1088,7 @@ bot.on("photo", async (ctx) => {
     } catch (error) {
 
         console.error(
-            "❌ ERROR MEMBUAT PHOTOBOOTH:",
+            "❌ ERROR PHOTOBOOTH:",
             error
         );
 
@@ -563,11 +1102,30 @@ bot.on("photo", async (ctx) => {
 });
 
 // ===============================
+// ESCAPE XML
+// ===============================
+
+function escapeXml(text) {
+
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
+}
+
+// ===============================
 // ERROR HANDLER
 // ===============================
 
 bot.catch((error) => {
-    console.error("❌ TELEGRAM ERROR:", error);
+
+    console.error(
+        "❌ TELEGRAM ERROR:",
+        error
+    );
+
 });
 
 // ===============================
@@ -576,15 +1134,31 @@ bot.catch((error) => {
 
 bot.launch()
     .then(() => {
-        console.log("🤖 Telegram Photobooth Bot aktif!");
+
+        console.log(
+            "🤖 Telegram Photobooth Bot aktif!"
+        );
+
     })
     .catch((error) => {
-        console.error("❌ BOT GAGAL START:", error);
+
+        console.error(
+            "❌ BOT GAGAL START:",
+            error
+        );
+
     });
 
 // ===============================
-// STOP
+// SHUTDOWN
 // ===============================
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+process.once(
+    "SIGINT",
+    () => bot.stop("SIGINT")
+);
+
+process.once(
+    "SIGTERM",
+    () => bot.stop("SIGTERM")
+);
