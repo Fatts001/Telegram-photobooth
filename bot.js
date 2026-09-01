@@ -10,7 +10,7 @@ if (!TOKEN) {
     process.exit(1);
 }
 
-// Web server supaya Abasthan mendeteksi port
+// Web server untuk Abasthan
 http.createServer((req, res) => {
     res.writeHead(200, {
         "Content-Type": "text/plain"
@@ -29,8 +29,12 @@ bot.start(async (ctx) => {
 
     await ctx.reply(
         "📸 PHOTOBOOTH\n\n" +
-        "Kirim 3 foto ke sini.\n" +
-        "Setelah foto ketiga, foto akan otomatis dibuat menjadi strip photobooth.\n\n" +
+        "Kirim 4 foto satu per satu.\n\n" +
+        "1️⃣ Foto pertama\n" +
+        "2️⃣ Foto kedua\n" +
+        "3️⃣ Foto ketiga\n" +
+        "4️⃣ Foto keempat\n\n" +
+        "Setelah foto ke-4, otomatis dibuat layout 2×2 ✨\n\n" +
         "Ketik /cancel untuk membatalkan."
     );
 });
@@ -54,7 +58,7 @@ bot.on("photo", async (ctx) => {
         const photo = photos[photos.length - 1];
 
         await ctx.reply(
-            `⏳ Memproses foto ${session.length + 1}/3...`
+            `⏳ Memproses foto ${session.length + 1}/4...`
         );
 
         const fileLink = await ctx.telegram.getFileLink(
@@ -73,71 +77,84 @@ bot.on("photo", async (ctx) => {
 
         session.push(buffer);
 
-        if (session.length < 3) {
+        if (session.length < 4) {
             await ctx.reply(
-                `✅ Foto ${session.length}/3 diterima.\n` +
+                `✅ Foto ${session.length}/4 diterima.\n` +
                 `📸 Kirim foto ke-${session.length + 1}.`
             );
 
             return;
         }
 
-        await ctx.reply("✨ Membuat photobooth...");
+        await ctx.reply("✨ Semua foto diterima!\nMembuat photobooth...");
 
-        const width = 900;
-        const height = 900;
+        const photoWidth = 800;
+        const photoHeight = 800;
+
         const padding = 30;
         const gap = 20;
         const footerHeight = 150;
+
+        const canvasWidth =
+            padding +
+            photoWidth +
+            gap +
+            photoWidth +
+            padding;
+
+        const canvasHeight =
+            padding +
+            photoHeight +
+            gap +
+            photoHeight +
+            footerHeight +
+            padding;
 
         const resizedPhotos = [];
 
         for (const image of session) {
             const resized = await sharp(image)
-                .resize(width, height, {
+                .resize(photoWidth, photoHeight, {
                     fit: "cover",
                     position: "centre"
                 })
                 .jpeg({
-                    quality: 90
+                    quality: 92
                 })
                 .toBuffer();
 
             resizedPhotos.push(resized);
         }
 
-        const finalWidth = width + padding * 2;
+        const now = new Date();
 
-        const finalHeight =
-            padding +
-            height +
-            gap +
-            height +
-            gap +
-            height +
-            footerHeight +
-            padding;
+        const date = now.toLocaleDateString("id-ID", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            timeZone: "Asia/Jakarta"
+        });
 
         const footer = `
-        <svg width="${finalWidth}" height="${footerHeight}">
+        <svg width="${canvasWidth}" height="${footerHeight}">
             <style>
                 .title {
                     fill: black;
-                    font-size: 42px;
+                    font-size: 40px;
                     font-family: Arial;
                     font-weight: bold;
                 }
 
-                .subtitle {
+                .date {
                     fill: #555;
-                    font-size: 22px;
+                    font-size: 24px;
                     font-family: Arial;
                 }
             </style>
 
             <text
                 x="50%"
-                y="60"
+                y="55"
                 text-anchor="middle"
                 class="title">
                 PHOTOBOOTH
@@ -145,18 +162,18 @@ bot.on("photo", async (ctx) => {
 
             <text
                 x="50%"
-                y="105"
+                y="100"
                 text-anchor="middle"
-                class="subtitle">
-                Telegram Photobooth
+                class="date">
+                ${date}
             </text>
         </svg>
         `;
 
         const result = await sharp({
             create: {
-                width: finalWidth,
-                height: finalHeight,
+                width: canvasWidth,
+                height: canvasHeight,
                 channels: 4,
                 background: {
                     r: 255,
@@ -167,29 +184,43 @@ bot.on("photo", async (ctx) => {
             }
         })
             .composite([
+                // FOTO 1 — kiri atas
                 {
                     input: resizedPhotos[0],
                     left: padding,
                     top: padding
                 },
+
+                // FOTO 2 — kanan atas
                 {
                     input: resizedPhotos[1],
-                    left: padding,
-                    top: padding + height + gap
+                    left: padding + photoWidth + gap,
+                    top: padding
                 },
+
+                // FOTO 3 — kiri bawah
                 {
                     input: resizedPhotos[2],
                     left: padding,
-                    top: padding + (height + gap) * 2
+                    top: padding + photoHeight + gap
                 },
+
+                // FOTO 4 — kanan bawah
+                {
+                    input: resizedPhotos[3],
+                    left: padding + photoWidth + gap,
+                    top: padding + photoHeight + gap
+                },
+
+                // Footer
                 {
                     input: Buffer.from(footer),
                     left: 0,
-                    top: padding + (height + gap) * 3
+                    top: padding + photoHeight * 2 + gap * 2
                 }
             ])
             .jpeg({
-                quality: 90
+                quality: 92
             })
             .toBuffer();
 
@@ -210,7 +241,7 @@ bot.on("photo", async (ctx) => {
         sessions.delete(userId);
 
         await ctx.reply(
-            "❌ Gagal membuat photobooth.\n" +
+            "❌ Gagal membuat photobooth.\n\n" +
             "Ketik /start lalu coba lagi."
         );
     }
