@@ -9,13 +9,13 @@ const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.BOT_TOKEN;
 const ADMIN_ID = 8401116235;
 
-/* =========================
-   WEB SERVER
-========================= */
+// =========================
+// WEB SERVER
+// =========================
 
 const server = http.createServer((req, res) => {
     res.writeHead(200, {
-        "Content-Type": "text/plain"
+        "Content-Type": "text/plain; charset=utf-8"
     });
 
     res.end("Telegram Photobooth Bot is running!");
@@ -25,44 +25,43 @@ server.listen(PORT, "0.0.0.0", () => {
     console.log("Web server aktif di port " + PORT);
 });
 
+// =========================
+// TOKEN
+// =========================
+
 if (!TOKEN) {
-    console.error("BOT_TOKEN belum ditemukan!");
+    console.error("ERROR: BOT_TOKEN belum ditemukan!");
     process.exit(1);
 }
 
 const bot = new Telegraf(TOKEN);
 const sessions = new Map();
 
-/* =========================
-   DATA
-========================= */
+// =========================
+// DATA
+// =========================
 
 const backgrounds = {
     bunga: {
         name: "Bunga",
         file: "bunga.jpg"
     },
-
     florel: {
         name: "Florel",
         file: "florel.jpg"
     },
-
     mawar: {
         name: "Mawar",
         file: "mawar.jpg"
     },
-
     stars: {
         name: "Stars",
         file: "stars.jpg"
     },
-
     sakuraa: {
         name: "Sakura",
         file: "sakuraa.jpg"
     },
-
     kupukupu: {
         name: "Kupu-kupu",
         file: "kupukupu.jpg"
@@ -103,9 +102,9 @@ function createSession() {
     };
 }
 
-/* =========================
-   AUDIO
-========================= */
+// =========================
+// AUDIO
+// =========================
 
 async function sendAudio(ctx, fileName) {
     const filePath = path.join(__dirname, fileName);
@@ -127,9 +126,9 @@ async function sendAudio(ctx, fileName) {
     }
 }
 
-/* =========================
-   KEYBOARD
-========================= */
+// =========================
+// KEYBOARD
+// =========================
 
 function countKeyboard() {
     return Markup.inlineKeyboard([
@@ -229,9 +228,9 @@ function decorationKeyboard() {
     ]);
 }
 
-/* =========================
-   START
-========================= */
+// =========================
+// START
+// =========================
 
 bot.start(async (ctx) => {
     sessions.set(
@@ -252,18 +251,15 @@ bot.start(async (ctx) => {
     );
 });
 
-/* =========================
-   COUNT
-========================= */
+// =========================
+// COUNT
+// =========================
 
 bot.action(
     /^count_(2|3|4|5|6)$/,
     async (ctx) => {
-
         const userId = ctx.from.id;
-        const count = Number(
-            ctx.match[1]
-        );
+        const count = Number(ctx.match[1]);
 
         if (!sessions.has(userId)) {
             await ctx.answerCbQuery(
@@ -272,8 +268,7 @@ bot.action(
             return;
         }
 
-        const session =
-            sessions.get(userId);
+        const session = sessions.get(userId);
 
         session.count = count;
         session.photos = [];
@@ -292,24 +287,15 @@ bot.action(
     }
 );
 
-/* =========================
-   BACKGROUND
-========================= */
+// =========================
+// BACKGROUND
+// =========================
 
 bot.action(
     /^bg_(.+)$/,
     async (ctx) => {
-
         const userId = ctx.from.id;
-        const selected =
-            ctx.match[1];
-
-        if (!backgrounds[selected]) {
-            await ctx.answerCbQuery(
-                "Background tidak ditemukan."
-            );
-            return;
-        }
+        const selected = ctx.match[1];
 
         if (!sessions.has(userId)) {
             await ctx.answerCbQuery(
@@ -318,14 +304,19 @@ bot.action(
             return;
         }
 
-        const filePath =
-            path.join(
-                __dirname,
-                backgrounds[selected].file
+        if (!backgrounds[selected]) {
+            await ctx.answerCbQuery(
+                "Background tidak ditemukan."
             );
+            return;
+        }
+
+        const filePath = path.join(
+            __dirname,
+            backgrounds[selected].file
+        );
 
         if (!fs.existsSync(filePath)) {
-
             await ctx.answerCbQuery(
                 "File tidak ditemukan."
             );
@@ -339,11 +330,9 @@ bot.action(
             return;
         }
 
-        const session =
-            sessions.get(userId);
+        const session = sessions.get(userId);
 
-        session.background =
-            selected;
+        session.background = selected;
 
         await ctx.answerCbQuery(
             backgrounds[selected].name +
@@ -365,24 +354,15 @@ bot.action(
     }
 );
 
-/* =========================
-   FILTER
-========================= */
+// =========================
+// FILTER
+// =========================
 
 bot.action(
     /^filter_(.+)$/,
     async (ctx) => {
-
         const userId = ctx.from.id;
-        const selected =
-            ctx.match[1];
-
-        if (!filters[selected]) {
-            await ctx.answerCbQuery(
-                "Filter tidak ditemukan."
-            );
-            return;
-        }
+        const selected = ctx.match[1];
 
         if (!sessions.has(userId)) {
             await ctx.answerCbQuery(
@@ -391,11 +371,16 @@ bot.action(
             return;
         }
 
-        const session =
-            sessions.get(userId);
+        if (!filters[selected]) {
+            await ctx.answerCbQuery(
+                "Filter tidak ditemukan."
+            );
+            return;
+        }
 
-        session.filter =
-            selected;
+        const session = sessions.get(userId);
+
+        session.filter = selected;
 
         await ctx.answerCbQuery(
             filters[selected] +
@@ -412,24 +397,15 @@ bot.action(
     }
 );
 
-/* =========================
-   DECORATION
-========================= */
+// =========================
+// DECORATION
+// =========================
 
 bot.action(
     /^decor_(.+)$/,
     async (ctx) => {
-
         const userId = ctx.from.id;
-        const selected =
-            ctx.match[1];
-
-        if (!decorations[selected]) {
-            await ctx.answerCbQuery(
-                "Efek tidak ditemukan."
-            );
-            return;
-        }
+        const selected = ctx.match[1];
 
         if (!sessions.has(userId)) {
             await ctx.answerCbQuery(
@@ -438,14 +414,17 @@ bot.action(
             return;
         }
 
-        const session =
-            sessions.get(userId);
+        if (!decorations[selected]) {
+            await ctx.answerCbQuery(
+                "Efek tidak ditemukan."
+            );
+            return;
+        }
 
-        session.decoration =
-            selected;
+        const session = sessions.get(userId);
 
-        session.waitingTitle =
-            true;
+        session.decoration = selected;
+        session.waitingTitle = true;
 
         await ctx.answerCbQuery(
             decorations[selected] +
@@ -467,67 +446,58 @@ bot.action(
     }
 );
 
-/* =========================
-   JUDUL
-========================= */
+// =========================
+// JUDUL
+// =========================
 
 bot.on(
     "text",
     async (ctx) => {
-
-        const userId =
-            ctx.from.id;
+        const userId = ctx.from.id;
 
         if (!sessions.has(userId)) {
             return;
         }
 
-        const session =
-            sessions.get(userId);
+        const session = sessions.get(userId);
 
         if (!session.waitingTitle) {
             return;
         }
 
-        let text =
-            ctx.message.text.trim();
+        let text = ctx.message.text.trim();
 
         if (
             text.toLowerCase() ===
             "tanpa judul"
         ) {
-
             session.title = "";
-
         } else {
+            // Hapus emoji dan karakter yang
+            // sering tidak didukung font SVG.
+            text = text
+                .normalize("NFKD")
+                .replace(
+                    /[\u{1F000}-\u{1FAFF}]/gu,
+                    ""
+                )
+                .replace(
+                    /[\u{2600}-\u{27BF}]/g,
+                    ""
+                )
+                .replace(
+                    /[\u{FE00}-\u{FE0F}]/gu,
+                    ""
+                )
+                .trim();
 
-            /*
-             * Hilangkan emoji/karakter
-             * yang sering berubah jadi
-             * kotak di SVG server.
-             */
-            text =
-                text
-                    .normalize("NFKD")
-                    .replace(
-                        /[\u{1F000}-\u{1FAFF}]/gu,
-                        ""
-                    )
-                    .replace(
-                        /[\u{2600}-\u{27BF}]/g,
-                        ""
-                    )
-                    .trim();
-
-            session.title =
-                text.substring(
-                    0,
-                    40
-                );
+            session.title = text.substring(
+                0,
+                40
+            );
         }
 
-        session.waitingTitle =
-            false;
+        session.waitingTitle = false;
 
         await ctx.reply(
             "Judul berhasil disimpan!\n\n" +
@@ -544,14 +514,13 @@ bot.on(
     }
 );
 
-/* =========================
-   BACKGROUND COMMAND
-========================= */
+// =========================
+// BACKGROUND COMMAND
+// =========================
 
 bot.command(
     "background",
     async (ctx) => {
-
         if (!sessions.has(ctx.from.id)) {
             sessions.set(
                 ctx.from.id,
@@ -566,14 +535,13 @@ bot.command(
     }
 );
 
-/* =========================
-   CANCEL
-========================= */
+// =========================
+// CANCEL
+// =========================
 
 bot.command(
     "cancel",
     async (ctx) => {
-
         sessions.delete(
             ctx.from.id
         );
@@ -585,34 +553,29 @@ bot.command(
     }
 );
 
-/* =========================
-   SARAN
-========================= */
+// =========================
+// SARAN
+// =========================
 
 bot.command(
     "saran",
     async (ctx) => {
-
-        const text =
-            ctx.message.text
-                .replace(
-                    /^\/saran(@\w+)?/i,
-                    ""
-                )
-                .trim();
+        const text = ctx.message.text
+            .replace(
+                /^\/saran(@\w+)?/i,
+                ""
+            )
+            .trim();
 
         if (!text) {
-
             await ctx.reply(
                 "Cara mengirim saran:\n\n" +
                 "/saran Tambahin background baru dong"
             );
-
             return;
         }
 
-        const userId =
-            ctx.from.id;
+        const userId = ctx.from.id;
 
         const name =
             ctx.from.first_name ||
@@ -620,15 +583,12 @@ bot.command(
 
         const username =
             ctx.from.username
-                ? "@" +
-                  ctx.from.username
+                ? "@" + ctx.from.username
                 : "Tidak ada username";
 
         try {
-
             await bot.telegram.sendMessage(
                 ADMIN_ID,
-
                 "SARAN BARU\n\n" +
                 "Nama: " +
                 name +
@@ -646,9 +606,7 @@ bot.command(
             await ctx.reply(
                 "Saran berhasil dikirim ke admin!"
             );
-
         } catch (error) {
-
             console.error(
                 "ERROR SARAN:",
                 error.message
@@ -661,109 +619,84 @@ bot.command(
     }
 );
 
-/* =========================
-   FILTER ENGINE
-========================= */
+// =========================
+// FILTER ENGINE
+// =========================
 
 async function applyFilter(
     buffer,
     filter
 ) {
-
-    let image =
-        sharp(buffer);
+    let image = sharp(buffer);
 
     if (filter === "bw") {
-
-        image =
-            image
-                .grayscale()
-                .modulate({
-                    brightness: 1.05,
-                    saturation: 0
-                });
-
-    } else if (
-        filter === "vintage"
-    ) {
-
-        image =
-            image.modulate({
+        image = image
+            .grayscale()
+            .modulate({
                 brightness: 1.05,
-                saturation: 0.75
+                saturation: 0
             });
+    }
 
-    } else if (
-        filter === "bright"
-    ) {
+    else if (filter === "vintage") {
+        image = image.modulate({
+            brightness: 1.05,
+            saturation: 0.75
+        });
+    }
 
-        image =
-            image.modulate({
-                brightness: 1.25,
+    else if (filter === "bright") {
+        image = image.modulate({
+            brightness: 1.25,
+            saturation: 1.1
+        });
+    }
+
+    else if (filter === "dark") {
+        image = image.modulate({
+            brightness: 0.72,
+            saturation: 0.95
+        });
+    }
+
+    else if (filter === "soft") {
+        image = image.modulate({
+            brightness: 1.08,
+            saturation: 0.85
+        });
+    }
+
+    else if (filter === "film") {
+        image = image.modulate({
+            brightness: 0.95,
+            saturation: 1.2
+        });
+    }
+
+    else if (filter === "warm") {
+        image = image
+            .modulate({
+                brightness: 1.05,
                 saturation: 1.1
+            })
+            .tint({
+                r: 255,
+                g: 225,
+                b: 190
             });
+    }
 
-    } else if (
-        filter === "dark"
-    ) {
-
-        image =
-            image.modulate({
-                brightness: 0.72,
+    else if (filter === "cool") {
+        image = image
+            .modulate({
+                brightness: 1.02,
                 saturation: 0.95
+            })
+            .tint({
+                r: 190,
+                g: 220,
+                b: 255
             });
-
-    } else if (
-        filter === "soft"
-    ) {
-
-        image =
-            image.modulate({
-                brightness: 1.08,
-                saturation: 0.85
-            });
-
-    } else if (
-        filter === "film"
-    ) {
-
-        image =
-            image.modulate({
-                brightness: 0.95,
-                saturation: 1.2
-            });
-
-    } else if (
-        filter === "warm"
-    ) {
-
-        image =
-            image
-                .modulate({
-                    brightness: 1.05,
-                    saturation: 1.1
-                })
-                .tint({
-                    r: 255,
-                    g: 225,
-                    b: 190
-                });
-
-    } else if (
-        filter === "cool"
-    ) {
-
-        image =
-            image
-                .modulate({
-                    brightness: 1.02,
-                    saturation: 0.95
-                })
-                .tint({
-                    r: 190,
-                    g: 220,
-                    b: 255
-                });
     }
 
     return image
@@ -781,74 +714,35 @@ async function applyFilter(
         .toBuffer();
 }
 
-
-/* =========================
-   XML SAFE TEXT
-========================= */
+// =========================
+// XML SAFE
+// =========================
 
 function escapeXml(text) {
-
     return String(text)
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&apos;"
-        );
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&apos;");
 }
 
-
-/* =========================
-   DEKORASI
-========================= */
+// =========================
+// DECORATION SVG
+// =========================
 
 function decorationSVG(
     type,
     width,
     height
 ) {
-
     let items = "";
 
-    function sparkle(
-        x,
-        y,
-        scale
-    ) {
-
+    function sparkle(x, y, scale) {
         return `
-        <g
-            transform="
-                translate(${x} ${y})
-                scale(${scale})
-            "
-        >
+        <g transform="translate(${x} ${y}) scale(${scale})">
             <path
-                d="
-                    M0 -30
-                    L7 -8
-                    L30 0
-                    L7 8
-                    L0 30
-                    L-7 8
-                    L-30 0
-                    L-7 -8
-                    Z
-                "
+                d="M0 -30 L7 -8 L30 0 L7 8 L0 30 L-7 8 L-30 0 L-7 -8 Z"
                 fill="white"
                 stroke="black"
                 stroke-width="2"
@@ -857,28 +751,11 @@ function decorationSVG(
         `;
     }
 
-    function heart(
-        x,
-        y,
-        scale
-    ) {
-
+    function heart(x, y, scale) {
         return `
-        <g
-            transform="
-                translate(${x} ${y})
-                scale(${scale})
-            "
-        >
+        <g transform="translate(${x} ${y}) scale(${scale})">
             <path
-                d="
-                    M0 30
-                    C-45 0 -35 -35 -10 -30
-                    C0 -28 0 -18 0 -18
-                    C0 -18 0 -28 10 -30
-                    C35 -35 45 0 0 30
-                    Z
-                "
+                d="M0 30 C-45 0 -35 -35 -10 -30 C0 -28 0 -18 0 -18 C0 -18 0 -28 10 -30 C35 -35 45 0 0 30 Z"
                 fill="#ff4f91"
                 stroke="white"
                 stroke-width="4"
@@ -887,81 +764,38 @@ function decorationSVG(
         `;
     }
 
-    function flower(
-        x,
-        y,
-        scale
-    ) {
-
+    function flower(x, y, scale) {
         return `
-        <g
-            transform="
-                translate(${x} ${y})
-                scale(${scale})
-            "
-        >
-
-            <circle
-                cx="0"
-                cy="-25"
-                r="18"
+        <g transform="translate(${x} ${y}) scale(${scale})">
+            <circle cx="0" cy="-25" r="18"
                 fill="#ff8fbd"
                 stroke="white"
-                stroke-width="2"
-            />
+                stroke-width="2"/>
 
-            <circle
-                cx="25"
-                cy="0"
-                r="18"
+            <circle cx="25" cy="0" r="18"
                 fill="#ff8fbd"
                 stroke="white"
-                stroke-width="2"
-            />
+                stroke-width="2"/>
 
-            <circle
-                cx="0"
-                cy="25"
-                r="18"
+            <circle cx="0" cy="25" r="18"
                 fill="#ff8fbd"
                 stroke="white"
-                stroke-width="2"
-            />
+                stroke-width="2"/>
 
-            <circle
-                cx="-25"
-                cy="0"
-                r="18"
+            <circle cx="-25" cy="0" r="18"
                 fill="#ff8fbd"
                 stroke="white"
-                stroke-width="2"
-            />
+                stroke-width="2"/>
 
-            <circle
-                cx="0"
-                cy="0"
-                r="12"
-                fill="#ffd84d"
-            />
-
+            <circle cx="0" cy="0" r="12"
+                fill="#ffd84d"/>
         </g>
         `;
     }
 
-    function butterfly(
-        x,
-        y,
-        scale
-    ) {
-
+    function butterfly(x, y, scale) {
         return `
-        <g
-            transform="
-                translate(${x} ${y})
-                scale(${scale})
-            "
-        >
-
+        <g transform="translate(${x} ${y}) scale(${scale})">
             <ellipse
                 cx="-18"
                 cy="-12"
@@ -1010,38 +844,15 @@ function decorationSVG(
                 rx="4"
                 fill="#4c4057"
             />
-
         </g>
         `;
     }
 
-    function star(
-        x,
-        y,
-        scale
-    ) {
-
+    function star(x, y, scale) {
         return `
-        <g
-            transform="
-                translate(${x} ${y})
-                scale(${scale})
-            "
-        >
+        <g transform="translate(${x} ${y}) scale(${scale})">
             <path
-                d="
-                    M0 -35
-                    L9 -12
-                    L35 -12
-                    L14 4
-                    L22 31
-                    L0 16
-                    L-22 31
-                    L-14 4
-                    L-35 -12
-                    L-9 -12
-                    Z
-                "
+                d="M0 -35 L9 -12 L35 -12 L14 4 L22 31 L0 16 L-22 31 L-14 4 L-35 -12 L-9 -12 Z"
                 fill="#ffd43b"
                 stroke="white"
                 stroke-width="4"
@@ -1050,29 +861,11 @@ function decorationSVG(
         `;
     }
 
-    function bow(
-        x,
-        y,
-        scale
-    ) {
-
+    function bow(x, y, scale) {
         return `
-        <g
-            transform="
-                translate(${x} ${y})
-                scale(${scale})
-            "
-        >
-
+        <g transform="translate(${x} ${y}) scale(${scale})">
             <path
-                d="
-                    M0 0
-                    C-35 -38 -65 -30 -60 0
-                    C-55 30 -25 20 0 5
-                    C25 20 55 30 60 0
-                    C65 -30 35 -38 0 0
-                    Z
-                "
+                d="M0 0 C-35 -38 -65 -30 -60 0 C-55 30 -25 20 0 5 C25 20 55 30 60 0 C65 -30 35 -38 0 0 Z"
                 fill="#ff69a8"
                 stroke="white"
                 stroke-width="4"
@@ -1086,202 +879,59 @@ function decorationSVG(
                 stroke="white"
                 stroke-width="3"
             />
-
         </g>
         `;
     }
 
-
     if (type === "sparkle") {
-
-        items += sparkle(
-            60,
-            75,
-            1
-        );
-
-        items += sparkle(
-            width - 60,
-            75,
-            1
-        );
-
-        items += sparkle(
-            60,
-            height - 70,
-            0.8
-        );
-
-        items += sparkle(
-            width - 60,
-            height - 70,
-            0.8
-        );
-
-        items += sparkle(
-            width / 2,
-            35,
-            0.5
-        );
+        items += sparkle(60, 75, 1);
+        items += sparkle(width - 60, 75, 1);
+        items += sparkle(60, height - 70, 0.8);
+        items += sparkle(width - 60, height - 70, 0.8);
+        items += sparkle(width / 2, 35, 0.5);
     }
 
-
-    else if (
-        type === "hearts"
-    ) {
-
-        items += heart(
-            60,
-            75,
-            0.8
-        );
-
-        items += heart(
-            width - 60,
-            75,
-            0.8
-        );
-
-        items += heart(
-            60,
-            height - 70,
-            0.65
-        );
-
-        items += heart(
-            width - 60,
-            height - 70,
-            0.65
-        );
+    else if (type === "hearts") {
+        items += heart(60, 75, 0.8);
+        items += heart(width - 60, 75, 0.8);
+        items += heart(60, height - 70, 0.65);
+        items += heart(width - 60, height - 70, 0.65);
     }
 
-
-    else if (
-        type === "flowers"
-    ) {
-
-        items += flower(
-            60,
-            75,
-            0.8
-        );
-
-        items += flower(
-            width - 60,
-            75,
-            0.8
-        );
-
-        items += flower(
-            60,
-            height - 70,
-            0.65
-        );
-
-        items += flower(
-            width - 60,
-            height - 70,
-            0.65
-        );
+    else if (type === "flowers") {
+        items += flower(60, 75, 0.8);
+        items += flower(width - 60, 75, 0.8);
+        items += flower(60, height - 70, 0.65);
+        items += flower(width - 60, height - 70, 0.65);
     }
 
-
-    else if (
-        type === "butterflies"
-    ) {
-
-        items += butterfly(
-            65,
-            80,
-            0.7
-        );
-
-        items += butterfly(
-            width - 65,
-            80,
-            0.7
-        );
-
-        items += butterfly(
-            65,
-            height - 75,
-            0.6
-        );
-
-        items += butterfly(
-            width - 65,
-            height - 75,
-            0.6
-        );
+    else if (type === "butterflies") {
+        items += butterfly(65, 80, 0.7);
+        items += butterfly(width - 65, 80, 0.7);
+        items += butterfly(65, height - 75, 0.6);
+        items += butterfly(width - 65, height - 75, 0.6);
     }
 
-
-    else if (
-        type === "stars"
-    ) {
-
-        items += star(
-            60,
-            75,
-            0.75
-        );
-
-        items += star(
-            width - 60,
-            75,
-            0.75
-        );
-
-        items += star(
-            60,
-            height - 70,
-            0.6
-        );
-
-        items += star(
-            width - 60,
-            height - 70,
-            0.6
-        );
+    else if (type === "stars") {
+        items += star(60, 75, 0.75);
+        items += star(width - 60, 75, 0.75);
+        items += star(60, height - 70, 0.6);
+        items += star(width - 60, height - 70, 0.6);
     }
 
-
-    else if (
-        type === "cute"
-    ) {
-
-        items += bow(
-            70,
-            75,
-            0.7
-        );
-
-        items += heart(
-            width - 65,
-            75,
-            0.7
-        );
-
-        items += bow(
-            70,
-            height - 70,
-            0.6
-        );
-
-        items += heart(
-            width - 65,
-            height - 70,
-            0.6
-        );
+    else if (type === "cute") {
+        items += bow(70, 75, 0.7);
+        items += heart(width - 65, 75, 0.7);
+        items += bow(70, height - 70, 0.6);
+        items += heart(width - 65, height - 70, 0.6);
     }
-
 
     return `
     <svg
+        xmlns="http://www.w3.org/2000/svg"
         width="${width}"
         height="${height}"
-        viewBox="0 0 ${width} ${height}"
-        xmlns="http://www.w3.org/2000/svg">
+        viewBox="0 0 ${width} ${height}">
 
         ${items}
 
@@ -1289,10 +939,9 @@ function decorationSVG(
     `;
 }
 
-
-/* =========================
-   TEKS FOOTER
-========================= */
+// =========================
+// FOOTER
+// =========================
 
 function footerSVG(
     width,
@@ -1301,18 +950,39 @@ function footerSVG(
     date,
     time
 ) {
+    const safeTitle = escapeXml(
+        title || ""
+    );
 
-    const safeTitle =
-        escapeXml(
-            title || ""
-        );
+    const titleText = safeTitle
+        ? `
+        <text
+            x="${width / 2}"
+            y="65"
+            text-anchor="middle"
+            fill="white"
+            font-family="Arial, sans-serif"
+            font-size="38"
+            font-weight="bold">
+            ${safeTitle}
+        </text>
+        `
+        : "";
+
+    const dateY = safeTitle
+        ? 125
+        : 90;
+
+    const timeY = safeTitle
+        ? 170
+        : 135;
 
     return `
     <svg
+        xmlns="http://www.w3.org/2000/svg"
         width="${width}"
         height="${height}"
-        viewBox="0 0 ${width} ${height}"
-        xmlns="http://www.w3.org/2000/svg">
+        viewBox="0 0 ${width} ${height}">
 
         <rect
             x="20"
@@ -1321,112 +991,73 @@ function footerSVG(
             height="${height - 30}"
             rx="35"
             fill="black"
-            fill-opacity="0.68"
+            fill-opacity="0.72"
         />
 
-        ${
-            safeTitle
-                ? `
-                <text
-                    x="${width / 2}"
-                    y="75"
-                    text-anchor="middle"
-                    fill="white"
-                    font-family="sans-serif"
-                    font-size="48"
-                    font-weight="bold">
-                    ${safeTitle}
-                </text>
-                `
-                : ""
-        }
+        ${titleText}
 
         <text
             x="${width / 2}"
-            y="${
-                safeTitle
-                    ? 130
-                    : 80
-            }"
+            y="${dateY}"
             text-anchor="middle"
             fill="white"
-            font-family="sans-serif"
-            font-size="30"
+            font-family="Arial, sans-serif"
+            font-size="28"
             font-weight="bold">
-
             ${escapeXml(date)}
-
         </text>
 
         <text
             x="${width / 2}"
-            y="${
-                safeTitle
-                    ? 175
-                    : 125
-            }"
+            y="${timeY}"
             text-anchor="middle"
             fill="white"
-            font-family="sans-serif"
-            font-size="30"
+            font-family="Arial, sans-serif"
+            font-size="28"
             font-weight="bold">
-
             ${escapeXml(time)}
-
         </text>
 
     </svg>
     `;
 }
 
-
-/* =========================
-   FOTO
-========================= */
+// =========================
+// PHOTO
+// =========================
 
 bot.on(
     "photo",
     async (ctx) => {
-
-        const userId =
-            ctx.from.id;
+        const userId = ctx.from.id;
 
         if (!sessions.has(userId)) {
-
             await ctx.reply(
                 "Ketik /start dulu untuk memulai."
             );
-
             return;
         }
 
-        const session =
-            sessions.get(userId);
+        const session = sessions.get(userId);
 
         if (!session.count) {
-
             await ctx.reply(
                 "Pilih jumlah foto terlebih dahulu."
             );
-
             return;
         }
 
         if (!session.background) {
-
             await ctx.reply(
                 "Pilih background terlebih dahulu."
             );
-
             return;
         }
 
         if (session.waitingTitle) {
-
             await ctx.reply(
                 "Masukkan judul terlebih dahulu."
             );
-
             return;
         }
 
@@ -1438,7 +1069,6 @@ bot.on(
         }
 
         try {
-
             const number =
                 session.photos.length + 1;
 
@@ -1479,15 +1109,12 @@ bot.on(
                     await response.arrayBuffer()
                 );
 
-            session.photos.push(
-                buffer
-            );
+            session.photos.push(buffer);
 
             if (
                 session.photos.length <
                 session.count
             ) {
-
                 await ctx.reply(
                     "Foto " +
                     session.photos.length +
@@ -1496,8 +1123,7 @@ bot.on(
                     " diterima!\n\n" +
                     "Kirim foto ke-" +
                     (
-                        session.photos.length +
-                        1
+                        session.photos.length + 1
                     ) +
                     "."
                 );
@@ -1505,23 +1131,20 @@ bot.on(
                 return;
             }
 
-
-            /* =========================
-               CANVAS
-            ========================= */
+            // =========================
+            // CANVAS
+            // =========================
 
             const photoWidth = 780;
             const photoHeight = 780;
 
             const padding = 60;
             const gap = 30;
-
             const columns = 2;
 
             const rows =
                 Math.ceil(
-                    session.count /
-                    columns
+                    session.count / columns
                 );
 
             const footerHeight = 240;
@@ -1537,10 +1160,9 @@ bot.on(
                 gap * (rows - 1) +
                 footerHeight;
 
-
-            /* =========================
-               BACKGROUND
-            ========================= */
+            // =========================
+            // BACKGROUND
+            // =========================
 
             const bgPath =
                 path.join(
@@ -1565,18 +1187,15 @@ bot.on(
                     })
                     .toBuffer();
 
-
-            /* =========================
-               PROCESS FOTO
-            ========================= */
+            // =========================
+            // PROCESS PHOTO
+            // =========================
 
             const processedPhotos = [];
 
             for (
-                const image
-                of session.photos
+                const image of session.photos
             ) {
-
                 const processed =
                     await applyFilter(
                         image,
@@ -1588,10 +1207,9 @@ bot.on(
                 );
             }
 
-
-            /* =========================
-               POSISI FOTO
-            ========================= */
+            // =========================
+            // PHOTO POSITIONS
+            // =========================
 
             const composite = [];
 
@@ -1600,30 +1218,26 @@ bot.on(
                 i < processedPhotos.length;
                 i++
             ) {
-
                 const row =
                     Math.floor(
                         i / columns
                     );
 
-                const lastOdd =
+                const isLastOdd =
                     session.count % 2 === 1 &&
                     i ===
                         processedPhotos.length - 1;
 
                 let left;
 
-                if (lastOdd) {
-
+                if (isLastOdd) {
                     left =
                         padding +
                         (
                             photoWidth +
                             gap
                         ) / 2;
-
                 } else {
-
                     const column =
                         i % columns;
 
@@ -1647,22 +1261,18 @@ bot.on(
                 composite.push({
                     input:
                         processedPhotos[i],
-
                     left:
                         Math.round(left),
-
                     top:
-                        top
+                        Math.round(top)
                 });
             }
 
+            // =========================
+            // DATE & TIME
+            // =========================
 
-            /* =========================
-               DATE & TIME
-            ========================= */
-
-            const now =
-                new Date();
+            const now = new Date();
 
             const date =
                 now.toLocaleDateString(
@@ -1689,10 +1299,9 @@ bot.on(
                     }
                 );
 
-
-            /* =========================
-               FOOTER
-            ========================= */
+            // =========================
+            // FOOTER
+            // =========================
 
             const footerTop =
                 padding * 2 +
@@ -1710,26 +1319,19 @@ bot.on(
 
             composite.push({
                 input:
-                    Buffer.from(
-                        footer
-                    ),
-
+                    Buffer.from(footer),
                 left: 0,
-
-                top:
-                    footerTop
+                top: footerTop
             });
 
-
-            /* =========================
-               DECORATION
-            ========================= */
+            // =========================
+            // DECORATION
+            // =========================
 
             if (
                 session.decoration !==
                 "none"
             ) {
-
                 const decoration =
                     decorationSVG(
                         session.decoration,
@@ -1742,34 +1344,26 @@ bot.on(
                         Buffer.from(
                             decoration
                         ),
-
                     left: 0,
-
                     top: 0
                 });
             }
 
-
-            /* =========================
-               GABUNG
-            ========================= */
+            // =========================
+            // MERGE
+            // =========================
 
             const result =
-                await sharp(
-                    background
-                )
-                    .composite(
-                        composite
-                    )
+                await sharp(background)
+                    .composite(composite)
                     .jpeg({
                         quality: 95
                     })
                     .toBuffer();
 
-
-            /* =========================
-               KIRIM
-            ========================= */
+            // =========================
+            // SEND
+            // =========================
 
             await ctx.replyWithPhoto(
                 {
@@ -1800,20 +1394,15 @@ bot.on(
                 "selesai.mp3"
             );
 
-            sessions.delete(
-                userId
-            );
+            sessions.delete(userId);
 
         } catch (error) {
-
             console.error(
                 "ERROR PHOTOBOOTH:",
                 error
             );
 
-            sessions.delete(
-                userId
-            );
+            sessions.delete(userId);
 
             await ctx.reply(
                 "Gagal membuat photobooth.\n\n" +
@@ -1823,53 +1412,48 @@ bot.on(
     }
 );
 
+// =========================
+// BOT ERROR
+// =========================
 
-/* =========================
-   BOT ERROR
-========================= */
+bot.catch((error) => {
+    console.error(
+        "TELEGRAM ERROR:",
+        error
+    );
+});
 
-bot.catch(
-    (error) => {
-
-        console.error(
-            "TELEGRAM ERROR:",
-            error
-        );
-
-    }
-);
-
-
-/* =========================
-   LAUNCH
-========================= */
+// =========================
+// LAUNCH
+// =========================
 
 bot.launch()
     .then(() => {
-
         console.log(
             "Telegram Photobooth Bot aktif!"
         );
-
     })
-    .catch(
-        (error) => {
+    .catch((error) => {
+        console.error(
+            "BOT GAGAL START:",
+            error
+        );
+    });
 
-            console.error(
-                "BOT GAGAL START:",
-                error
-            );
-
-        }
-    );
-
+// =========================
+// SHUTDOWN
+// =========================
 
 process.once(
     "SIGINT",
-    () => bot.stop("SIGINT")
+    () => {
+        bot.stop("SIGINT");
+    }
 );
 
 process.once(
     "SIGTERM",
-    () => bot.stop("SIGTERM")
+    () => {
+        bot.stop("SIGTERM");
+    }
 );
