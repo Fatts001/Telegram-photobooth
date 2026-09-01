@@ -7,32 +7,33 @@ const sharp = require("sharp");
 
 const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.BOT_TOKEN;
-
-// ID Telegram admin
 const ADMIN_ID = 8401116235;
+
+// ===============================
+// WEB SERVER DULU
+// ===============================
+
+const server = http.createServer((req, res) => {
+    res.writeHead(200, {
+        "Content-Type": "text/plain"
+    });
+
+    res.end("Telegram Photobooth Bot is running!");
+});
+
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`🌐 Web server aktif di port ${PORT}`);
+});
 
 // ===============================
 // CEK TOKEN
 // ===============================
 
 if (!TOKEN) {
-    console.error("❌ BOT_TOKEN belum diatur di Environment Variables!");
-    process.exit(1);
+    console.error("❌ BOT_TOKEN TIDAK DITEMUKAN!");
+    console.error("⚠️ Tambahkan BOT_TOKEN di Environment Variables Abasthan.");
+    return;
 }
-
-// ===============================
-// WEB SERVER UNTUK ABASTHAN
-// ===============================
-
-http.createServer((req, res) => {
-    res.writeHead(200, {
-        "Content-Type": "text/plain"
-    });
-
-    res.end("Telegram Photobooth Bot is running!");
-}).listen(PORT, "0.0.0.0", () => {
-    console.log(`🌐 Server berjalan di port ${PORT}`);
-});
 
 // ===============================
 // BOT
@@ -40,11 +41,10 @@ http.createServer((req, res) => {
 
 const bot = new Telegraf(TOKEN);
 
-// Simpan sesi pengguna
 const sessions = new Map();
 
 // ===============================
-// DAFTAR BACKGROUND
+// BACKGROUND
 // ===============================
 
 const backgrounds = {
@@ -80,7 +80,7 @@ const backgrounds = {
 };
 
 // ===============================
-// MENU BACKGROUND
+// KEYBOARD BACKGROUND
 // ===============================
 
 function backgroundKeyboard() {
@@ -101,7 +101,7 @@ function backgroundKeyboard() {
 }
 
 // ===============================
-// /START
+// START
 // ===============================
 
 bot.start(async (ctx) => {
@@ -112,14 +112,11 @@ bot.start(async (ctx) => {
     });
 
     await ctx.reply(
-        "📸 *PHOTOBOOTH*\n\n" +
+        "📸 PHOTOBOOTH\n\n" +
         "Selamat datang! ✨\n\n" +
-        "Sebelum mulai, pilih background yang lu mau 👇\n\n" +
-        "Setelah memilih background, kirim 4 foto satu per satu.",
-        {
-            parse_mode: "Markdown",
-            ...backgroundKeyboard()
-        }
+        "Pilih background terlebih dahulu 👇\n\n" +
+        "Setelah itu kirim 4 foto satu per satu.",
+        backgroundKeyboard()
     );
 });
 
@@ -129,97 +126,94 @@ bot.start(async (ctx) => {
 
 bot.action(/^bg_(.+)$/, async (ctx) => {
 
-    const userId = ctx.from.id;
-    const selected = ctx.match[1];
+    try {
 
-    if (!backgrounds[selected]) {
-        await ctx.answerCbQuery("❌ Background tidak ditemukan.");
-        return;
-    }
+        const userId = ctx.from.id;
+        const selected = ctx.match[1];
 
-    const backgroundPath = path.join(
-        __dirname,
-        backgrounds[selected].file
-    );
+        if (!backgrounds[selected]) {
+            await ctx.answerCbQuery("❌ Background tidak ditemukan.");
+            return;
+        }
 
-    // Cek file ada atau tidak
-    if (!fs.existsSync(backgroundPath)) {
+        const backgroundPath = path.join(
+            __dirname,
+            backgrounds[selected].file
+        );
+
+        if (!fs.existsSync(backgroundPath)) {
+
+            console.error(
+                `❌ File tidak ditemukan: ${backgroundPath}`
+            );
+
+            await ctx.answerCbQuery(
+                "❌ File background belum ada."
+            );
+
+            await ctx.reply(
+                `❌ File ${backgrounds[selected].file} tidak ditemukan di server.\n\n` +
+                "Pastikan file sudah ada di repository GitHub."
+            );
+
+            return;
+        }
+
+        if (!sessions.has(userId)) {
+            sessions.set(userId, {
+                photos: [],
+                background: null
+            });
+        }
+
+        const session = sessions.get(userId);
+
+        session.background = selected;
+        session.photos = [];
 
         await ctx.answerCbQuery(
-            "❌ File background belum ada di server."
+            `${backgrounds[selected].name} dipilih!`
         );
 
-        await ctx.reply(
-            `❌ Background ${backgrounds[selected].name} belum ditemukan.\n\n` +
-            `Pastikan file:\n` +
-            \`${backgrounds[selected].file}\`\n\n` +
-            `sudah ada di repository GitHub.`,
-            {
-                parse_mode: "Markdown"
-            }
+        await ctx.editMessageText(
+            "✅ BACKGROUND DIPILIH!\n\n" +
+            `🎨 ${backgrounds[selected].name}\n\n` +
+            "Sekarang kirim 4 foto 📸\n\n" +
+            "1️⃣ Foto pertama\n" +
+            "2️⃣ Foto kedua\n" +
+            "3️⃣ Foto ketiga\n" +
+            "4️⃣ Foto keempat\n\n" +
+            "Foto ke-4 akan langsung dibuat menjadi photobooth ✨"
         );
 
-        return;
+    } catch (error) {
+
+        console.error("❌ ERROR BACKGROUND:", error);
+
     }
-
-    // Kalau belum ada sesi, buat
-    if (!sessions.has(userId)) {
-        sessions.set(userId, {
-            photos: [],
-            background: null
-        });
-    }
-
-    const session = sessions.get(userId);
-
-    session.background = selected;
-    session.photos = [];
-
-    await ctx.answerCbQuery(
-        `${backgrounds[selected].name} dipilih!`
-    );
-
-    await ctx.editMessageText(
-        "✅ *Background berhasil dipilih!*\n\n" +
-        `🎨 Background: ${backgrounds[selected].name}\n\n` +
-        "Sekarang kirim *4 foto* satu per satu 📸\n\n" +
-        "1️⃣ Foto pertama\n" +
-        "2️⃣ Foto kedua\n" +
-        "3️⃣ Foto ketiga\n" +
-        "4️⃣ Foto keempat\n\n" +
-        "Setelah foto ke-4, photobooth otomatis dibuat ✨",
-        {
-            parse_mode: "Markdown"
-        }
-    );
 });
 
 // ===============================
-// /BACKGROUND
+// BACKGROUND COMMAND
 // ===============================
 
 bot.command("background", async (ctx) => {
 
-    const userId = ctx.from.id;
-
-    if (!sessions.has(userId)) {
-        sessions.set(userId, {
+    if (!sessions.has(ctx.from.id)) {
+        sessions.set(ctx.from.id, {
             photos: [],
             background: null
         });
     }
 
     await ctx.reply(
-        "🎨 *Pilih background baru:*",
-        {
-            parse_mode: "Markdown",
-            ...backgroundKeyboard()
-        }
+        "🎨 Pilih background:",
+        backgroundKeyboard()
     );
 });
 
 // ===============================
-// /CANCEL
+// CANCEL
 // ===============================
 
 bot.command("cancel", async (ctx) => {
@@ -227,72 +221,61 @@ bot.command("cancel", async (ctx) => {
     sessions.delete(ctx.from.id);
 
     await ctx.reply(
-        "❌ Sesi photobooth dibatalkan.\n\n" +
-        "Ketik /start kalau mau mulai lagi 📸"
+        "❌ Sesi dibatalkan.\n\n" +
+        "Ketik /start untuk mulai lagi."
     );
 });
 
 // ===============================
-// /SARAN
+// SARAN
 // ===============================
 
 bot.command("saran", async (ctx) => {
 
-    const userId = ctx.from.id;
-    const username = ctx.from.username
-        ? `@${ctx.from.username}`
-        : "Tidak ada username";
-
-    const name = ctx.from.first_name || "Tidak diketahui";
-
     const text = ctx.message.text
-        .replace("/saran", "")
+        .replace(/^\/saran(@\w+)?/i, "")
         .trim();
 
-    // Kalau /saran langsung tanpa isi
     if (!text) {
 
         await ctx.reply(
-            "💡 *Fitur Saran*\n\n" +
-            "Ketik saran lu setelah command `/saran`.\n\n" +
-            "Contoh:\n" +
-            "`/saran Tambahin background warna pink dong`",
-            {
-                parse_mode: "Markdown"
-            }
+            "💡 Cara mengirim saran:\n\n" +
+            "/saran Tambahin background baru dong"
         );
 
         return;
     }
 
-    // Kirim saran ke admin
+    const userId = ctx.from.id;
+    const name = ctx.from.first_name || "Tidak diketahui";
+
+    const username = ctx.from.username
+        ? `@${ctx.from.username}`
+        : "Tidak ada username";
+
     try {
 
         await bot.telegram.sendMessage(
             ADMIN_ID,
 
-            "💡 *SARAN BARU*\n\n" +
+            "💡 SARAN BARU\n\n" +
             `👤 Nama: ${name}\n` +
             `🔹 Username: ${username}\n` +
             `🆔 ID: ${userId}\n\n` +
-            `💬 Saran:\n${text}`,
-
-            {
-                parse_mode: "Markdown"
-            }
+            `💬 Saran:\n${text}`
         );
 
         await ctx.reply(
-            "✅ Saran lu sudah dikirim ke admin!\n\n" +
-            "Makasih udah bantu bikin bot ini makin bagus ❤️"
+            "✅ Saran berhasil dikirim!\n\n" +
+            "Makasih sudah membantu mengembangkan bot ini ❤️"
         );
 
     } catch (error) {
 
-        console.error("❌ Gagal mengirim saran:", error);
+        console.error("❌ ERROR SARAN:", error);
 
         await ctx.reply(
-            "❌ Saran gagal dikirim. Coba lagi nanti."
+            "❌ Saran gagal dikirim."
         );
     }
 });
@@ -305,12 +288,11 @@ bot.on("photo", async (ctx) => {
 
     const userId = ctx.from.id;
 
-    // Kalau belum /start
     if (!sessions.has(userId)) {
 
         await ctx.reply(
-            "⚠️ Pilih background dulu ya.\n\n" +
-            "Ketik /start untuk mulai 📸"
+            "⚠️ Lu belum mulai photobooth.\n\n" +
+            "Ketik /start dulu."
         );
 
         return;
@@ -318,33 +300,30 @@ bot.on("photo", async (ctx) => {
 
     const session = sessions.get(userId);
 
-    // Belum pilih background
     if (!session.background) {
 
         await ctx.reply(
-            "⚠️ Lu belum pilih background.\n\n" +
-            "Ketik /background lalu pilih background dulu 🎨"
+            "⚠️ Pilih background dulu.\n\n" +
+            "Ketik /background."
         );
 
         return;
     }
 
-    // Maksimal 4 foto
     if (session.photos.length >= 4) {
         return;
     }
 
     try {
 
-        const currentNumber = session.photos.length + 1;
+        const number = session.photos.length + 1;
 
         await ctx.reply(
-            `⏳ Memproses foto ${currentNumber}/4...`
+            `⏳ Memproses foto ${number}/4...`
         );
 
         const photos = ctx.message.photo;
 
-        // Ambil kualitas foto terbesar
         const photo = photos[photos.length - 1];
 
         const fileLink = await ctx.telegram.getFileLink(
@@ -354,7 +333,7 @@ bot.on("photo", async (ctx) => {
         const response = await fetch(fileLink.href);
 
         if (!response.ok) {
-            throw new Error("Gagal mengambil foto dari Telegram.");
+            throw new Error("Gagal mengambil foto.");
         }
 
         const buffer = Buffer.from(
@@ -363,7 +342,6 @@ bot.on("photo", async (ctx) => {
 
         session.photos.push(buffer);
 
-        // Belum 4 foto
         if (session.photos.length < 4) {
 
             await ctx.reply(
@@ -374,12 +352,8 @@ bot.on("photo", async (ctx) => {
             return;
         }
 
-        // ===============================
-        // SEMUA FOTO SUDAH ADA
-        // ===============================
-
         await ctx.reply(
-            "✨ Semua foto sudah diterima!\n\n" +
+            "✨ 4 foto sudah lengkap!\n\n" +
             "🎨 Membuat photobooth..."
         );
 
@@ -392,7 +366,6 @@ bot.on("photo", async (ctx) => {
 
         const padding = 45;
         const gap = 30;
-
         const footerHeight = 170;
 
         const canvasWidth =
@@ -418,12 +391,6 @@ bot.on("photo", async (ctx) => {
             __dirname,
             backgrounds[session.background].file
         );
-
-        if (!fs.existsSync(backgroundPath)) {
-            throw new Error(
-                `Background tidak ditemukan: ${backgrounds[session.background].file}`
-            );
-        }
 
         const background = await sharp(backgroundPath)
             .resize(canvasWidth, canvasHeight, {
@@ -463,19 +430,15 @@ bot.on("photo", async (ctx) => {
         const selectedName =
             backgrounds[session.background].name;
 
-        const now = new Date();
-
-        const date = now.toLocaleDateString("id-ID", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            timeZone: "Asia/Jakarta"
-        });
-
-        const footerTop =
-            padding +
-            photoHeight * 2 +
-            gap * 2;
+        const date = new Date().toLocaleDateString(
+            "id-ID",
+            {
+                day: "2-digit",
+                month: "2-digit",
+                year: "numeric",
+                timeZone: "Asia/Jakarta"
+            }
+        );
 
         const footer = `
         <svg width="${canvasWidth}" height="${footerHeight}">
@@ -487,22 +450,16 @@ bot.on("photo", async (ctx) => {
                     font-weight: bold;
                 }
 
-                .subtitle {
+                .sub {
                     fill: white;
                     font-size: 25px;
-                    font-family: Arial;
-                }
-
-                .date {
-                    fill: white;
-                    font-size: 22px;
                     font-family: Arial;
                 }
             </style>
 
             <text
                 x="50%"
-                y="55"
+                y="60"
                 text-anchor="middle"
                 class="title">
                 PHOTOBOOTH
@@ -510,24 +467,24 @@ bot.on("photo", async (ctx) => {
 
             <text
                 x="50%"
-                y="95"
+                y="105"
                 text-anchor="middle"
-                class="subtitle">
+                class="sub">
                 ${selectedName}
             </text>
 
             <text
                 x="50%"
-                y="135"
+                y="145"
                 text-anchor="middle"
-                class="date">
+                class="sub">
                 ${date}
             </text>
         </svg>
         `;
 
         // ===============================
-        // GABUNGKAN
+        // GABUNG
         // ===============================
 
         const result = await sharp(background)
@@ -560,7 +517,10 @@ bot.on("photo", async (ctx) => {
                 {
                     input: Buffer.from(footer),
                     left: 0,
-                    top: footerTop
+                    top:
+                        padding +
+                        photoHeight * 2 +
+                        gap * 2
                 }
 
             ])
@@ -579,25 +539,25 @@ bot.on("photo", async (ctx) => {
             },
             {
                 caption:
-                    "📸 *Photobooth lu sudah jadi!*\n\n" +
-                    `🎨 ${selectedName}\n` +
-                    "✨ Makasih sudah menggunakan bot ini!",
-                parse_mode: "Markdown"
+                    "📸 Photobooth lu sudah jadi! ✨\n\n" +
+                    `🎨 ${selectedName}`
             }
         );
 
-        // Hapus sesi
         sessions.delete(userId);
 
     } catch (error) {
 
-        console.error("❌ ERROR PHOTObOOTH:", error);
+        console.error(
+            "❌ ERROR MEMBUAT PHOTOBOOTH:",
+            error
+        );
 
         sessions.delete(userId);
 
         await ctx.reply(
             "❌ Gagal membuat photobooth.\n\n" +
-            "Coba ketik /start lalu ulangi lagi."
+            "Ketik /start lalu coba lagi."
         );
     }
 });
@@ -607,25 +567,24 @@ bot.on("photo", async (ctx) => {
 // ===============================
 
 bot.catch((error) => {
-    console.error("❌ Telegram error:", error);
+    console.error("❌ TELEGRAM ERROR:", error);
 });
 
 // ===============================
 // START BOT
 // ===============================
 
-bot.launch();
-
-console.log("🤖 Telegram Photobooth Bot aktif!");
+bot.launch()
+    .then(() => {
+        console.log("🤖 Telegram Photobooth Bot aktif!");
+    })
+    .catch((error) => {
+        console.error("❌ BOT GAGAL START:", error);
+    });
 
 // ===============================
 // STOP
 // ===============================
 
-process.once("SIGINT", () => {
-    bot.stop("SIGINT");
-});
-
-process.once("SIGTERM", () => {
-    bot.stop("SIGTERM");
-});
+process.once("SIGINT", () => bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot.stop("SIGTERM"));
