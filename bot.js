@@ -1,8 +1,27 @@
+const http = require("http");
 const { Telegraf } = require("telegraf");
 const sharp = require("sharp");
 
-const bot = new Telegraf(process.env.BOT_TOKEN);
+const PORT = process.env.PORT || 3000;
+const TOKEN = process.env.BOT_TOKEN;
 
+if (!TOKEN) {
+    console.error("❌ BOT_TOKEN belum diatur!");
+    process.exit(1);
+}
+
+// Web server supaya Abasthan mendeteksi port
+http.createServer((req, res) => {
+    res.writeHead(200, {
+        "Content-Type": "text/plain"
+    });
+
+    res.end("Telegram Photobooth Bot is running!");
+}).listen(PORT, "0.0.0.0", () => {
+    console.log(`🌐 Server berjalan di port ${PORT}`);
+});
+
+const bot = new Telegraf(TOKEN);
 const sessions = new Map();
 
 bot.start(async (ctx) => {
@@ -11,7 +30,7 @@ bot.start(async (ctx) => {
     await ctx.reply(
         "📸 PHOTOBOOTH\n\n" +
         "Kirim 3 foto ke sini.\n" +
-        "Setelah foto ketiga, bot akan otomatis membuat strip photobooth.\n\n" +
+        "Setelah foto ketiga, foto akan otomatis dibuat menjadi strip photobooth.\n\n" +
         "Ketik /cancel untuk membatalkan."
     );
 });
@@ -32,20 +51,20 @@ bot.on("photo", async (ctx) => {
 
     try {
         const photos = ctx.message.photo;
-        const biggestPhoto = photos[photos.length - 1];
+        const photo = photos[photos.length - 1];
 
         await ctx.reply(
-            `⏳ Foto ${session.length + 1}/3 sedang diproses...`
+            `⏳ Memproses foto ${session.length + 1}/3...`
         );
 
         const fileLink = await ctx.telegram.getFileLink(
-            biggestPhoto.file_id
+            photo.file_id
         );
 
         const response = await fetch(fileLink.href);
 
         if (!response.ok) {
-            throw new Error("Gagal mengambil foto dari Telegram");
+            throw new Error("Gagal mengambil foto.");
         }
 
         const buffer = Buffer.from(
@@ -56,25 +75,25 @@ bot.on("photo", async (ctx) => {
 
         if (session.length < 3) {
             await ctx.reply(
-                `✅ Foto ${session.length}/3 diterima.\n\n` +
+                `✅ Foto ${session.length}/3 diterima.\n` +
                 `📸 Kirim foto ke-${session.length + 1}.`
             );
 
             return;
         }
 
-        await ctx.reply("✨ Semua foto sudah diterima!\nMembuat photobooth...");
+        await ctx.reply("✨ Membuat photobooth...");
 
         const width = 900;
         const height = 900;
         const padding = 30;
         const gap = 20;
-        const footerHeight = 140;
+        const footerHeight = 150;
 
         const resizedPhotos = [];
 
-        for (const photo of session) {
-            const resized = await sharp(photo)
+        for (const image of session) {
+            const resized = await sharp(image)
                 .resize(width, height, {
                     fit: "cover",
                     position: "centre"
@@ -99,7 +118,7 @@ bot.on("photo", async (ctx) => {
             footerHeight +
             padding;
 
-        const footerSvg = `
+        const footer = `
         <svg width="${finalWidth}" height="${footerHeight}">
             <style>
                 .title {
@@ -109,7 +128,7 @@ bot.on("photo", async (ctx) => {
                     font-weight: bold;
                 }
 
-                .sub {
+                .subtitle {
                     fill: #555;
                     font-size: 22px;
                     font-family: Arial;
@@ -118,7 +137,7 @@ bot.on("photo", async (ctx) => {
 
             <text
                 x="50%"
-                y="55"
+                y="60"
                 text-anchor="middle"
                 class="title">
                 PHOTOBOOTH
@@ -126,9 +145,9 @@ bot.on("photo", async (ctx) => {
 
             <text
                 x="50%"
-                y="95"
+                y="105"
                 text-anchor="middle"
-                class="sub">
+                class="subtitle">
                 Telegram Photobooth
             </text>
         </svg>
@@ -164,7 +183,7 @@ bot.on("photo", async (ctx) => {
                     top: padding + (height + gap) * 2
                 },
                 {
-                    input: Buffer.from(footerSvg),
+                    input: Buffer.from(footer),
                     left: 0,
                     top: padding + (height + gap) * 3
                 }
@@ -186,24 +205,24 @@ bot.on("photo", async (ctx) => {
         sessions.delete(userId);
 
     } catch (error) {
-        console.error(error);
+        console.error("❌ ERROR:", error);
 
         sessions.delete(userId);
 
         await ctx.reply(
-            "❌ Gagal membuat photobooth.\n\n" +
-            "Coba ketik /start lalu kirim ulang 3 foto."
+            "❌ Gagal membuat photobooth.\n" +
+            "Ketik /start lalu coba lagi."
         );
     }
 });
 
 bot.catch((error) => {
-    console.error("Telegram Bot Error:", error);
+    console.error("Telegram error:", error);
 });
 
 bot.launch();
 
-console.log("🤖 Photobooth bot sedang berjalan...");
+console.log("🤖 Telegram Photobooth Bot aktif!");
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
